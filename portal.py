@@ -5,7 +5,7 @@ import uuid
 from flask import Flask, jsonify, request
 import threading
 
-DB_FILE = "data/data/jobs.db"
+DB_FILE = "jobs.db"
 
 # ------------------- DB Setup -------------------
 def init_db():
@@ -153,6 +153,7 @@ with tab3:
         skills_list = [s.strip() for s in new_skills.split(",")]
         add_job(job_id, new_job_title, new_company, skills_list, new_location)
         st.success(f"Job {new_job_title} added!")
+
 
 
 
