@@ -1,32 +1,125 @@
 import streamlit as st
 import requests
+import pandas as pd
 
-API_URL = "http://127.0.0.1:7860"  # your Flask backend URL
+# ---------------- CONFIG ----------------
+BACKEND_URL = "https://krishnasimha-portal-backend.hf.space"
 
-st.title("Job Portal")
+st.set_page_config(
+    page_title="Admin – Job Portal",
+    layout="wide"
+)
 
-tab1, tab2 = st.tabs(["Jobs", "Applications"])
+st.title("🛠️ Job Portal Admin Dashboard")
 
-with tab1:
-    st.header("Available Jobs")
-    jobs = requests.get(f"{API_URL}/jobs").json()
-    for job in jobs:
-        st.subheader(job["job_title"])
-        st.write("Company:", job["company_name"])
-        st.write("Location:", job["location"])
-        st.write("Skills:", ", ".join(job["skills"]))
-        if st.button(f"Apply for {job['job_title']}", key=job["job_id"]):
-            student_name = st.text_input("Your Name", key=job["job_id"]+"_name")
-            if student_name:
-                resp = requests.post(f"{API_URL}/apply", json={"job_id": job["job_id"], "student_name": student_name})
-                if resp.json()["status"]=="success":
-                    st.success("Applied successfully!")
+# ---------------- HELPERS ----------------
+def fetch_jobs():
+    res = requests.get(f"{BACKEND_URL}/jobs")
+    res.raise_for_status()
+    return res.json()
 
-with tab2:
-    st.header("Applications")
-    apps = requests.get(f"{API_URL}/applications").json()
-    for app in apps:
-        st.write(f"{app['student_name']} applied for job {app['job_id']} | Status: {app['status']}")
+def fetch_applications():
+    res = requests.get(f"{BACKEND_URL}/applications")
+    res.raise_for_status()
+    return res.json()
+
+def add_job(payload):
+    res = requests.post(f"{BACKEND_URL}/add_job", json=payload)
+    res.raise_for_status()
+    return res.json()
+
+# ---------------- SIDEBAR ----------------
+st.sidebar.header("Navigation")
+page = st.sidebar.radio(
+    "Go to",
+    ["📋 Jobs", "📨 Applications", "➕ Add Job"]
+)
+
+# ==========================================================
+# 📋 JOBS VIEW
+# ==========================================================
+if page == "📋 Jobs":
+    st.subheader("📋 All Jobs in Database")
+
+    try:
+        jobs = fetch_jobs()
+
+        if not jobs:
+            st.info("No jobs found in database.")
+        else:
+            df = pd.DataFrame(jobs)
+            df["skills"] = df["skills"].apply(lambda x: ", ".join(x))
+
+            st.dataframe(
+                df,
+                use_container_width=True
+            )
+
+            st.caption(f"Total jobs: {len(df)}")
+
+    except Exception as e:
+        st.error("Failed to fetch jobs")
+        st.code(str(e))
+
+# ==========================================================
+# 📨 APPLICATIONS VIEW
+# ==========================================================
+elif page == "📨 Applications":
+    st.subheader("📨 Applications Received")
+
+    try:
+        apps = fetch_applications()
+
+        if not apps:
+            st.info("No applications yet.")
+        else:
+            df = pd.DataFrame(apps)
+
+            st.dataframe(
+                df,
+                use_container_width=True
+            )
+
+            st.caption(f"Total applications: {len(df)}")
+
+    except Exception as e:
+        st.error("Failed to fetch applications")
+        st.code(str(e))
+
+# ==========================================================
+# ➕ ADD JOB
+# ==========================================================
+elif page == "➕ Add Job":
+    st.subheader("➕ Add New Job")
+
+    with st.form("add_job_form"):
+        title = st.text_input("Job Title")
+        company = st.text_input("Company Name")
+        skills = st.text_input("Skills (comma separated)")
+        location = st.selectbox("Location", ["Remote", "Onsite", "Hybrid"])
+
+        submitted = st.form_submit_button("Add Job")
+
+        if submitted:
+            if not title or not company or not skills:
+                st.warning("Please fill all fields.")
+            else:
+                payload = {
+                    "job_title": title,
+                    "company_name": company,
+                    "skills": [s.strip() for s in skills.split(",")],
+                    "location": location
+                }
+
+                try:
+                    res = add_job(payload)
+                    st.success(f"Job added successfully 🎉")
+                    st.code(res)
+
+                except Exception as e:
+                    st.error("Failed to add job")
+                    st.code(str(e))
+
 
 
 
